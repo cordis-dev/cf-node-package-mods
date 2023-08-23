@@ -45,7 +45,7 @@ exports.default = util.createRule({
                         type: 'object',
                         properties: {
                             vars: {
-                                enum: ['all', 'local'],
+                                enum: ['all', 'local', 'none'],
                             },
                             varsIgnorePattern: {
                                 type: 'string',
@@ -179,6 +179,11 @@ exports.default = util.createRule({
                     ((_b = options.destructuredArrayIgnorePattern) === null || _b === void 0 ? void 0 : _b.test(def.name.name))) {
                     continue;
                 }
+				
+                if (options.vars === 'none' && def.type !== utils_1.TSESLint.Scope.DefinitionType.CatchClause && def.type !== utils_1.TSESLint.Scope.DefinitionType.Parameter) {
+					continue;
+				}
+				
                 // skip catch variables
                 if (def.type === utils_1.TSESLint.Scope.DefinitionType.CatchClause) {
                     if (options.caughtErrors === 'none') {
