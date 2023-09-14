@@ -27,6 +27,12 @@ module.exports = async function getPostcssResult(stylelint, options = {}) {
 	if (cached) {
 		return cached;
 	}
+	
+	const fileExtension = options.filePath ? path.extname(options.filePath).slice(1).toLowerCase() : '';
+	if (previouslyInferredExtensions[fileExtension])
+	{
+		options.customSyntax = previouslyInferredExtensions[fileExtension];
+	}	
 
 	const syntax = options.customSyntax
 		? getCustomSyntax(options.customSyntax, stylelint._options.configBasedir)
@@ -116,6 +122,25 @@ function getCustomSyntax(customSyntax, basedir) {
 
 	throw new Error('Custom syntax must be a string or a Syntax object');
 }
+
+/** @type {{ [key: string]: string }} */
+const previouslyInferredExtensions = {
+	html: 'postcss-html',
+	htm: 'postcss-html',
+	js: '@stylelint/postcss-css-in-js',
+	jsx: '@stylelint/postcss-css-in-js',
+	less: 'postcss-less',
+	md: 'postcss-markdown',
+	sass: 'postcss-sass',
+	sss: 'sugarss',
+	scss: 'postcss-scss',
+	svelte: 'postcss-html',
+	ts: '@stylelint/postcss-css-in-js',
+	tsx: '@stylelint/postcss-css-in-js',
+	vue: 'postcss-html',
+	xml: 'postcss-html',
+	xst: 'postcss-html',
+};
 
 /**
  * @param {StylelintInternalApi} stylelint
