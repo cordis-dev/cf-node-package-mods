@@ -24,7 +24,6 @@
 !@remix-run/eslint-config/index.js
 !@remix-run/eslint-config/internal.js
 !@remix-run/eslint-config/jest-testing-library.js
-!@remix-run/eslint-config/jest.js
 !@remix-run/eslint-config/node.js
 !@typescript-eslint
 !@typescript-eslint/eslint-plugin
@@ -58,6 +57,8 @@
 !eslint-config-react-app
 !eslint-config-react-app/base.js
 !eslint-config-react-app/jest.js
+!eslint-config-taro
+!eslint-config-taro/index.js
 !eslint-plugin-compat
 !eslint-plugin-compat/node_modules
 !eslint-plugin-compat/node_modules/browserslist
