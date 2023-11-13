@@ -43,7 +43,8 @@ const
     ruleReplacements = require("../../conf/replacements.json");
 const { getRuleFromConfig } = require("../config/flat-config-helpers");
 const { FlatConfigArray } = require("../config/flat-config-array");
-
+const { RuleValidator } = require("../config/rule-validator");
+const { assertIsRuleOptions, assertIsRuleSeverity } = require("../config/flat-config-schema");
 const debug = require("debug")("eslint:linter");
 const MAX_AUTOFIX_PASSES = 10;
 const DEFAULT_PARSER_NAME = "espree";
@@ -362,13 +363,13 @@ function extractDirectiveComment(value) {
  * Parses comments in file to extract file-specific config of rules, globals
  * and environments and merges them with global config; also code blocks
  * where reporting is disabled or enabled and merges them with reporting config.
- * @param {ASTNode} ast The top node of the AST.
+ * @param {SourceCode} sourceCode The SourceCode object to get comments from.
  * @param {function(string): {create: Function}} ruleMapper A map from rule IDs to defined rules
  * @param {string|null} warnInlineConfig If a string then it should warn directive comments as disabled. The string value is the config name what the setting came from.
  * @returns {{configuredRules: Object, enabledGlobals: {value:string,comment:Token}[], exportedVariables: Object, problems: LintMessage[], disableDirectives: DisableDirective[]}}
  * A collection of the directive comments that were found, along with any problems that occurred when parsing
  */
-function getDirectiveComments(ast, ruleMapper, warnInlineConfig) {
+function getDirectiveComments(sourceCode, ruleMapper, warnInlineConfig) {
     const configuredRules = {};
     const enabledGlobals = Object.create(null);
     const exportedVariables = {};
@@ -378,7 +379,7 @@ function getDirectiveComments(ast, ruleMapper, warnInlineConfig) {
         builtInRules: Rules
     });
 
-    ast.comments.filter(token => token.type !== "Shebang").forEach(comment => {
+    sourceCode.getInlineConfigNodes().filter(token => token.type !== "Shebang").forEach(comment => {
         const { directivePart, justificationPart } = extractDirectiveComment(comment.value);
 
         const match = directivesPattern.exec(directivePart);
@@ -507,6 +508,69 @@ function getDirectiveComments(ast, ruleMapper, warnInlineConfig) {
         configuredRules,
         enabledGlobals,
         exportedVariables,
+        problems,
+        disableDirectives
+    };
+}
+
+/**
+ * Parses comments in file to extract disable directives.
+ * @param {SourceCode} sourceCode The SourceCode object to get comments from.
+ * @param {function(string): {create: Function}} ruleMapper A map from rule IDs to defined rules
+ * @returns {{problems: LintMessage[], disableDirectives: DisableDirective[]}}
+ * A collection of the directive comments that were found, along with any problems that occurred when parsing
+ */
+function getDirectiveCommentsForFlatConfig(sourceCode, ruleMapper) {
+    const problems = [];
+    const disableDirectives = [];
+
+    sourceCode.getInlineConfigNodes().filter(token => token.type !== "Shebang").forEach(comment => {
+        const { directivePart, justificationPart } = extractDirectiveComment(comment.value);
+
+        const match = directivesPattern.exec(directivePart);
+
+        if (!match) {
+            return;
+        }
+        const directiveText = match[1];
+        const lineCommentSupported = /^eslint-disable-(next-)?line$/u.test(directiveText);
+
+        if (comment.type === "Line" && !lineCommentSupported) {
+            return;
+        }
+
+        if (directiveText === "eslint-disable-line" && comment.loc.start.line !== comment.loc.end.line) {
+            const message = `${directiveText} comment should not span multiple lines.`;
+
+            problems.push(createLintingProblem({
+                ruleId: null,
+                message,
+                loc: comment.loc
+            }));
+            return;
+        }
+
+        const directiveValue = directivePart.slice(match.index + directiveText.length);
+
+        switch (directiveText) {
+            case "eslint-disable":
+            case "eslint-enable":
+            case "eslint-disable-next-line":
+            case "eslint-disable-line": {
+                const directiveType = directiveText.slice("eslint-".length);
+                const options = { commentToken: comment, type: directiveType, value: directiveValue, justification: justificationPart, ruleMapper };
+                const { directives, directiveProblems } = createDisableDirectives(options);
+
+                disableDirectives.push(...directives);
+                problems.push(...directiveProblems);
+                break;
+            }
+
+            // no default
+        }
+    });
+
+    return {
         problems,
         disableDirectives
     };
@@ -1334,7 +1398,7 @@ class Linter {
 
         const sourceCode = slots.lastSourceCode;
         const commentDirectives = options.allowInlineConfig
-            ? getDirectiveComments(sourceCode.ast, ruleId => getRule(slots, ruleId), options.warnInlineConfig)
+            ? getDirectiveComments(sourceCode, ruleId => getRule(slots, ruleId), options.warnInlineConfig)
             : { configuredRules: {}, enabledGlobals: {}, exportedVariables: {}, problems: [], disableDirectives: [] };
 
         // augment global scope with declared global variables
@@ -1629,24 +1693,112 @@ class Linter {
         }
 
         const sourceCode = slots.lastSourceCode;
-        const commentDirectives = options.allowInlineConfig
-            ? getDirectiveComments(
-                sourceCode.ast,
-                ruleId => getRuleFromConfig(ruleId, config),
-                options.warnInlineConfig
+
+        /*
+         * Make adjustments based on the language options. For JavaScript,
+         * this is primarily about adding variables into the global scope
+         * to account for ecmaVersion and configured globals.
+         */
+        sourceCode.applyLanguageOptions(languageOptions);
+
+        const mergedInlineConfig = {
+            rules: {}
+        };
+        const inlineConfigProblems = [];
+
+        /*
+         * Inline config can be either enabled or disabled. If disabled, it's possible
+         * to detect the inline config and emit a warning (though this is not required).
+         * So we first check to see if inline config is allowed at all, and if so, we
+         * need to check if it's a warning or not.
+         */
+        if (options.allowInlineConfig) {
+
+            // if inline config should warn then add the warnings
+            if (options.warnInlineConfig) {
+                sourceCode.getInlineConfigNodes().forEach(node => {
+                    inlineConfigProblems.push(createLintingProblem({
+                        ruleId: null,
+                        message: `'${sourceCode.text.slice(node.range[0], node.range[1])}' has no effect because you have 'noInlineConfig' setting in ${options.warnInlineConfig}.`,
+                        loc: node.loc,
+                        severity: 1
+                    }));
+
+                });
+            } else {
+                const inlineConfigResult = sourceCode.applyInlineConfig();
+
+                inlineConfigProblems.push(
+                    ...inlineConfigResult.problems
+                        .map(createLintingProblem)
+                        .map(problem => {
+                            problem.fatal = true;
+                            return problem;
+                        })
+                );
+
+                // next we need to verify information about the specified rules
+                const ruleValidator = new RuleValidator();
+
+                for (const { config: inlineConfig, node } of inlineConfigResult.configs) {
+
+                    Object.keys(inlineConfig.rules).forEach(ruleId => {
+                        const rule = getRuleFromConfig(ruleId, config);
+                        const ruleValue = inlineConfig.rules[ruleId];
+
+                        if (!rule) {
+                            inlineConfigProblems.push(createLintingProblem({ ruleId, loc: node.loc }));
+                            return;
+                        }
+
+                        try {
+
+                            const ruleOptions = Array.isArray(ruleValue) ? ruleValue : [ruleValue];
+
+                            assertIsRuleOptions(ruleId, ruleValue);
+                            assertIsRuleSeverity(ruleId, ruleOptions[0]);
+
+                            ruleValidator.validate({
+                                plugins: config.plugins,
+                                rules: {
+                                    [ruleId]: ruleOptions
+                                }
+                            });
+                            mergedInlineConfig.rules[ruleId] = ruleValue;
+                        } catch (err) {
+
+                            let baseMessage = err.message.slice(
+                                err.message.startsWith("Key \"rules\":")
+                                    ? err.message.indexOf(":", 12) + 1
+                                    : err.message.indexOf(":") + 1
+                            ).trim();
+
+                            if (err.messageTemplate) {
+                                baseMessage += ` You passed "${ruleValue}".`;
+                            }
+
+                            inlineConfigProblems.push(createLintingProblem({
+                                ruleId,
+                                message: `Inline configuration for rule "${ruleId}" is invalid:\n\t${baseMessage}\n`,
+                                loc: node.loc
+                            }));
+                        }
+                    });
+                }
+            }
+        }
+
+        const commentDirectives = options.allowInlineConfig && !options.warnInlineConfig
+            ? getDirectiveCommentsForFlatConfig(
+                sourceCode,
+                ruleId => getRuleFromConfig(ruleId, config)
             )
-            : { configuredRules: {}, enabledGlobals: {}, exportedVariables: {}, problems: [], disableDirectives: [] };
+            : { problems: [], disableDirectives: [] };
 
-        // augment global scope with declared global variables
-        addDeclaredGlobals(
-            sourceCode.scopeManager.scopes[0],
-            configuredGlobals,
-            { exportedVariables: commentDirectives.exportedVariables, enabledGlobals: commentDirectives.enabledGlobals }
-        );
-
-        const configuredRules = Object.assign({}, config.rules, commentDirectives.configuredRules);
-
+        const configuredRules = Object.assign({}, config.rules, mergedInlineConfig.rules);
         let lintingProblems;
+
+        sourceCode.finalize();
 
         try {
             lintingProblems = runRules(
@@ -1688,6 +1840,7 @@ class Linter {
             disableFixes: options.disableFixes,
             problems: lintingProblems
                 .concat(commentDirectives.problems)
+                .concat(inlineConfigProblems)
                 .sort((problemA, problemB) => problemA.line - problemB.line || problemA.column - problemB.column),
             reportUnusedDisableDirectives: options.reportUnusedDisableDirectives
         });
