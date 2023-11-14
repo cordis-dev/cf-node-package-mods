@@ -19,6 +19,9 @@
 !@nrwl/eslint-plugin-nx/node_modules/nx/src
 !@nrwl/eslint-plugin-nx/node_modules/nx/src/config
 !@nrwl/eslint-plugin-nx/node_modules/nx/src/config/workspaces.js
+!@react-native
+!@react-native/eslint-config
+!@react-native/eslint-config/index.js
 !@remix-run
 !@remix-run/eslint-config
 !@remix-run/eslint-config/index.js
