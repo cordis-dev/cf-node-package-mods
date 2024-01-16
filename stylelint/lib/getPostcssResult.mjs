@@ -1,11 +1,11 @@
-'use strict';
+import { readFile } from 'node:fs/promises';
 
-const LazyResult = require('postcss/lib/lazy-result').default;
-const path = require('path');
-const { default: postcss } = require('postcss');
-const { promises: fs } = require('fs');
+import LazyResult from 'postcss/lib/lazy-result';
+import postcss from 'postcss';
+import path from 'path';
 
-const getModulePath = require('./utils/getModulePath');
+import dynamicImport from './utils/dynamicImport.mjs';
+import getModulePath from './utils/getModulePath.mjs';
 
 /** @typedef {import('postcss').Result} Result */
 /** @typedef {import('postcss').Syntax} Syntax */
@@ -21,69 +21,72 @@ const postcssProcessor = postcss();
  *
  * @returns {Promise<Result>}
  */
-module.exports = async function getPostcssResult(stylelint, options = {}) {
-	const cached = options.filePath ? stylelint._postcssResultCache.get(options.filePath) : undefined;
+export default async function getPostcssResult(stylelint, { customSyntax, filePath, code } = {}) {
+	const cached = filePath ? stylelint._postcssResultCache.get(filePath) : undefined;
 
 	if (cached) {
 		return cached;
 	}
 	
-	const fileExtension = options.filePath ? path.extname(options.filePath).slice(1).toLowerCase() : '';
+	const fileExtension = filePath ? path.extname(filePath).slice(1).toLowerCase() : '';
 	if (previouslyInferredExtensions[fileExtension])
 	{
-		options.customSyntax = previouslyInferredExtensions[fileExtension];
-	}	
+		customSyntax = previouslyInferredExtensions[fileExtension];
+	}
 
-	const syntax = options.customSyntax
-		? getCustomSyntax(options.customSyntax, stylelint._options.configBasedir)
-		: cssSyntax(stylelint, options.filePath);
+	const syntax = await (customSyntax
+		? getCustomSyntax(customSyntax, stylelint._options.configBasedir)
+		: cssSyntax(stylelint._options.fix));
 
 	const postcssOptions = {
-		from: options.filePath,
+		from: filePath,
 		syntax,
 	};
 
 	/** @type {string | undefined} */
 	let getCode;
 
-	if (options.code !== undefined) {
-		getCode = options.code;
-	} else if (options.filePath) {
-		getCode = await fs.readFile(options.filePath, 'utf8');
+	if (code !== undefined) {
+		getCode = code;
+	} else if (filePath) {
+		getCode = await readFile(filePath, 'utf8');
 	}
 
 	if (getCode === undefined) {
-		return Promise.reject(new Error('code or filePath required'));
+		throw new Error('code or filePath required');
 	}
 
 	const postcssResult = await new LazyResult(postcssProcessor, getCode, postcssOptions);
 
-	if (options.filePath) {
-		stylelint._postcssResultCache.set(options.filePath, postcssResult);
+	if (filePath) {
+		stylelint._postcssResultCache.set(filePath, postcssResult);
 	}
 
 	return postcssResult;
-};
+}
 
 /**
  * @param {CustomSyntax} customSyntax
  * @param {string | undefined} basedir
- * @returns {Syntax}
+ * @returns {Promise<Syntax>}
  */
-function getCustomSyntax(customSyntax, basedir) {
+async function getCustomSyntax(customSyntax, basedir) {
 	if (typeof customSyntax === 'string') {
 		const customSyntaxLookup = basedir ? getModulePath(basedir, customSyntax) : customSyntax;
 
 		let resolved;
 
 		try {
-			resolved = require(customSyntaxLookup);
+			resolved = await dynamicImport(customSyntaxLookup);
+			resolved = resolved.default ?? resolved;
 		} catch (error) {
 			if (
 				error &&
 				typeof error === 'object' &&
 				'code' in error &&
-				error.code === 'MODULE_NOT_FOUND' &&
+				// TODO: Remove 'MODULE_NOT_FOUND' when we drop the CommonJS support.
+				// See https://nodejs.org/api/errors.html#module_not_found
+				(error.code === 'MODULE_NOT_FOUND' || error.code === 'ERR_MODULE_NOT_FOUND') &&
 				'message' in error &&
 				typeof error.message === 'string' &&
 				error.message.includes(customSyntax)
@@ -143,25 +146,11 @@ const previouslyInferredExtensions = {
 };
 
 /**
- * @param {StylelintInternalApi} stylelint
- * @param {string|undefined} filePath
- * @returns {Syntax}
+ * @param {boolean | undefined} fix
+ * @returns {Promise<Syntax>}
  */
-function cssSyntax(stylelint, filePath) {
-	const fileExtension = filePath ? path.extname(filePath).slice(1).toLowerCase() : '';
-	const extensions = ['css', 'pcss', 'postcss'];
+async function cssSyntax(fix) {
+	const parse = await (fix ? import('postcss-safe-parser').then((m) => m.default) : postcss.parse);
 
-	if (fileExtension && !extensions.includes(fileExtension)) {
-		console.warn(
-			`${filePath}: you should use the "customSyntax" option when linting something other than CSS`,
-		);
-	}
-
-	return {
-		parse:
-			stylelint._options.fix && extensions.includes(fileExtension)
-				? require('postcss-safe-parser')
-				: postcss.parse,
-		stringify: postcss.stringify,
-	};
+	return { parse, stringify: postcss.stringify };
 }
