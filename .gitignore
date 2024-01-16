@@ -104,4 +104,4 @@
 !eslint/node_modules/@eslint/eslintrc/dist/eslintrc.cjs
 !stylelint
 !stylelint/lib
-!stylelint/lib/getPostcssResult.js
+!stylelint/lib/getPostcssResult.mjs
