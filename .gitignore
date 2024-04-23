@@ -19,6 +19,11 @@
 !@nrwl/eslint-plugin-nx/node_modules/nx/src
 !@nrwl/eslint-plugin-nx/node_modules/nx/src/config
 !@nrwl/eslint-plugin-nx/node_modules/nx/src/config/workspaces.js
+!@nx
+!@nx/eslint-plugin
+!@nx/eslint-plugin/src
+!@nx/eslint-plugin/src/utils
+!@nx/eslint-plugin/src/utils/project-graph-utils.js
 !@react-native
 !@react-native/eslint-config
 !@react-native/eslint-config/index.js
