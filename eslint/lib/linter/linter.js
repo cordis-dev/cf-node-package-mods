@@ -45,6 +45,7 @@ const { getRuleFromConfig } = require("../config/flat-config-helpers");
 const { FlatConfigArray } = require("../config/flat-config-array");
 const { RuleValidator } = require("../config/rule-validator");
 const { assertIsRuleOptions, assertIsRuleSeverity } = require("../config/flat-config-schema");
+const { normalizeSeverityToString } = require("../shared/severity");
 const debug = require("debug")("eslint:linter");
 const MAX_AUTOFIX_PASSES = 10;
 const DEFAULT_PARSER_NAME = "espree";
@@ -52,7 +53,6 @@ const DEFAULT_ECMA_VERSION = 5;
 const commentParser = new ConfigCommentParser();
 const DEFAULT_ERROR_LOC = { start: { line: 1, column: 0 }, end: { line: 1, column: 1 } };
 const parserSymbol = Symbol.for("eslint.RuleTester.parser");
-const globals = require("../../conf/globals");
 
 //------------------------------------------------------------------------------
 // Typedefs
@@ -145,29 +145,6 @@ const globals = require("../../conf/globals");
  */
 function isEspree(parser) {
     return !!(parser === espree || parser[parserSymbol] === espree);
-}
-
-/**
- * Retrieves globals for the given ecmaVersion.
- * @param {number} ecmaVersion The version to retrieve globals for.
- * @returns {Object} The globals for the given ecmaVersion.
- */
-function getGlobalsForEcmaVersion(ecmaVersion) {
-
-    switch (ecmaVersion) {
-        case 3:
-            return globals.es3;
-
-        case 5:
-            return globals.es5;
-
-        default:
-            if (ecmaVersion < 2015) {
-                return globals[`es${ecmaVersion + 2009}`];
-            }
-
-            return globals[`es${ecmaVersion}`];
-    }
 }
 
 /**
@@ -342,24 +319,6 @@ function createDisableDirectives(options) {
 }
 
 /**
- * Extract the directive and the justification from a given directive comment and trim them.
- * @param {string} value The comment text to extract.
- * @returns {{directivePart: string, justificationPart: string}} The extracted directive and justification.
- */
-function extractDirectiveComment(value) {
-    const match = /\s-{2,}\s/u.exec(value);
-
-    if (!match) {
-        return { directivePart: value.trim(), justificationPart: "" };
-    }
-
-    const directive = value.slice(0, match.index).trim();
-    const justification = value.slice(match.index + match[0].length).trim();
-
-    return { directivePart: directive, justificationPart: justification };
-}
-
-/**
  * Parses comments in file to extract file-specific config of rules, globals
  * and environments and merges them with global config; also code blocks
  * where reporting is disabled or enabled and merges them with reporting config.
@@ -380,7 +339,7 @@ function getDirectiveComments(sourceCode, ruleMapper, warnInlineConfig) {
     });
 
     sourceCode.getInlineConfigNodes().filter(token => token.type !== "Shebang").forEach(comment => {
-        const { directivePart, justificationPart } = extractDirectiveComment(comment.value);
+        const { directivePart, justificationPart } = commentParser.extractDirectiveComment(comment.value);
 
         const match = directivesPattern.exec(directivePart);
 
@@ -525,7 +484,7 @@ function getDirectiveCommentsForFlatConfig(sourceCode, ruleMapper) {
     const disableDirectives = [];
 
     sourceCode.getInlineConfigNodes().filter(token => token.type !== "Shebang").forEach(comment => {
-        const { directivePart, justificationPart } = extractDirectiveComment(comment.value);
+        const { directivePart, justificationPart } = commentParser.extractDirectiveComment(comment.value);
 
         const match = directivesPattern.exec(directivePart);
 
@@ -645,7 +604,7 @@ function findEslintEnv(text) {
         if (match[0].endsWith("*/")) {
             retv = Object.assign(
                 retv || {},
-                commentParser.parseListConfig(extractDirectiveComment(match[1]).directivePart)
+                commentParser.parseListConfig(commentParser.extractDirectiveComment(match[1]).directivePart)
             );
         }
     }
@@ -696,9 +655,11 @@ function normalizeVerifyOptions(providedOptions, config) {
         reportUnusedDisableDirectives = reportUnusedDisableDirectives ? "error" : "off";
     }
     if (typeof reportUnusedDisableDirectives !== "string") {
-        reportUnusedDisableDirectives =
-            linterOptions.reportUnusedDisableDirectives
-                ? "warn" : "off";
+        if (typeof linterOptions.reportUnusedDisableDirectives === "boolean") {
+            reportUnusedDisableDirectives = linterOptions.reportUnusedDisableDirectives ? "warn" : "off";
+        } else {
+            reportUnusedDisableDirectives = linterOptions.reportUnusedDisableDirectives === void 0 ? "off" : normalizeSeverityToString(linterOptions.reportUnusedDisableDirectives);
+        }
     }
 
     return {
@@ -962,6 +923,7 @@ const DEPRECATED_SOURCECODE_PASSTHROUGHS = {
     getTokensBefore: "getTokensBefore",
     getTokensBetween: "getTokensBetween"
 };
+
 
 const BASE_TRAVERSAL_CONTEXT = Object.freeze(
     Object.keys(DEPRECATED_SOURCECODE_PASSTHROUGHS).reduce(
@@ -1468,7 +1430,7 @@ class Linter {
     verify(textOrSourceCode, config, filenameOrOptions) {
         debug("Verify");
 
-        const { configType } = internalSlotsMap.get(this);
+        const { configType, cwd } = internalSlotsMap.get(this);
 
         const options = typeof filenameOrOptions === "string"
             ? { filename: filenameOrOptions }
@@ -1487,7 +1449,7 @@ class Linter {
                 let configArray = config;
 
                 if (!Array.isArray(config) || typeof config.getConfig !== "function") {
-                    configArray = new FlatConfigArray(config);
+                    configArray = new FlatConfigArray(config, { basePath: cwd });
                     configArray.normalizeSync();
                 }
 
@@ -1623,19 +1585,6 @@ class Linter {
 
         languageOptions.ecmaVersion = normalizeEcmaVersionForLanguageOptions(
             languageOptions.ecmaVersion
-        );
-
-        /*
-         * add configured globals and language globals
-         *
-         * using Object.assign instead of object spread for performance reasons
-         * https://github.com/eslint/eslint/issues/16302
-         */
-        const configuredGlobals = Object.assign(
-            {},
-            getGlobalsForEcmaVersion(languageOptions.ecmaVersion),
-            languageOptions.sourceType === "commonjs" ? globals.commonjs : void 0,
-            languageOptions.globals
         );
 
         // double check that there is a parser to avoid mysterious error messages

@@ -167,7 +167,7 @@ module.exports = function(usingFlatConfig) {
                 alias: "c",
                 type: "path::String",
                 description: usingFlatConfig
-                    ? "Use this configuration instead of eslint.config.js"
+                    ? "Use this configuration instead of eslint.config.js, eslint.config.mjs, or eslint.config.cjs"
                     : "Use this configuration, overriding .eslintrc.* config options if present"
             },
             envFlag,
@@ -305,6 +305,13 @@ module.exports = function(usingFlatConfig) {
                 type: "Boolean",
                 default: void 0,
                 description: "Adds reported errors for unused eslint-disable and eslint-enable directives"
+            },
+            {
+                option: "report-unused-disable-directives-severity",
+                type: "String",
+                default: void 0,
+                description: "Chooses severity level for reporting unused eslint-disable and eslint-enable directives",
+                enum: ["off", "warn", "error", "0", "1", "2"]
             },
             {
                 heading: "Caching"
