@@ -17,9 +17,7 @@ var _default = exports.default = (0, _utils2.createRule)({
   name: __filename,
   meta: {
     docs: {
-      category: 'Best Practices',
-      description: 'Disallow use of deprecated functions',
-      recommended: 'error'
+      description: 'Disallow use of deprecated functions'
     },
     messages: {
       deprecatedFunction: '`{{ deprecation }}` has been deprecated in favor of `{{ replacement }}`'
