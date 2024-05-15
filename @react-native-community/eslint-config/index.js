@@ -14,6 +14,11 @@ module.exports = {
 
   parserOptions: {
     sourceType: 'module',
+	requireConfigFile: false,
+	ecmaVersion: "latest",
+    babelOptions: {
+      presets: [require.resolve("@babel/preset-react")],
+    }
   },
 
   extends: ['plugin:prettier/recommended'],
