@@ -25,6 +25,9 @@
 !@nx/eslint-plugin/src/utils
 !@nx/eslint-plugin/src/utils/project-graph-utils.js
 !@react-native
+!@react-native-community
+!@react-native-community/eslint-config
+!@react-native-community/eslint-config/index.js
 !@react-native/eslint-config
 !@react-native/eslint-config/index.js
 !@remix-run
