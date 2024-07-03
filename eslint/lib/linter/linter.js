@@ -1250,7 +1250,7 @@ class Linter {
 		if (options.only !== undefined)
 		{
 			list = lodash.pickBy(list, function(value, key) {
-				return key === options.only;
+				return options.only.includes(key);
 			});
 		}
 		

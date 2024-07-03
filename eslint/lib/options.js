@@ -394,8 +394,8 @@ module.exports = function(usingFlatConfig) {
             },
             {
                 option: "only",
-                type: "String",
-                description: "Limit to single rule"
+                type: "[String]",
+                description: "Limited rules"
             },
             {
                 option: "except",
