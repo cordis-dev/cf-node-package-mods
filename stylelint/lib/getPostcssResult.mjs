@@ -7,11 +7,8 @@ import path from 'path';
 import dynamicImport from './utils/dynamicImport.mjs';
 import getModulePath from './utils/getModulePath.mjs';
 
-/** @typedef {import('postcss').Result} Result */
-/** @typedef {import('postcss').Syntax} Syntax */
-/** @typedef {import('stylelint').CustomSyntax} CustomSyntax */
-/** @typedef {import('stylelint').GetPostcssOptions} GetPostcssOptions */
-/** @typedef {import('stylelint').InternalApi} StylelintInternalApi */
+/** @import {Result, Syntax} from 'postcss' */
+/** @import {CustomSyntax, GetPostcssOptions, InternalApi as StylelintInternalApi} from 'stylelint' */
 
 const postcssProcessor = postcss();
 
