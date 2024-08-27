@@ -65,6 +65,8 @@
 !eslint-config-next
 !eslint-config-next/index.js
 !eslint-config-next/parser.js
+!eslint-config-oclif-typescript
+!eslint-config-oclif-typescript/index.js
 !eslint-config-react-app
 !eslint-config-react-app/base.js
 !eslint-config-react-app/jest.js
