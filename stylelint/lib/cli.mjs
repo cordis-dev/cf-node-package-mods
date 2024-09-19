@@ -303,6 +303,10 @@ const flags = {
 		shortFlag: 'v',
 		type: 'boolean',
 	},
+	only: {
+		type: 'string',
+		isMultiple: true,
+	},
 };
 
 /**
@@ -350,6 +354,7 @@ export default async function main(argv) {
 		stdin,
 		stdinFilename,
 		version,
+		only,
 	} = cli.flags;
 
 	const showHelp = () => cli.showHelp(EXIT_CODE_SUCCESS);
@@ -378,6 +383,10 @@ export default async function main(argv) {
 	const options = {
 		formatter,
 	};
+	
+	if (Array.isArray(only)) {
+		options.only = only;
+	}
 
 	if (isBoolean(quiet)) {
 		options.quiet = quiet;

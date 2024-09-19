@@ -57,6 +57,7 @@ export default async function standalone({
 	reportDescriptionlessDisables,
 	reportInvalidScopeDisables,
 	reportNeedlessDisables,
+	only,
 }) {
 	const startTime = Date.now();
 
@@ -114,6 +115,7 @@ export default async function standalone({
 		fix,
 		quiet,
 		quietDeprecationWarnings,
+		only,
 	});
 
 	if (!files) {

@@ -127,7 +127,7 @@ export async function augmentConfigFull(stylelint, filePath, cosmiconfigResult) 
 		);
 	}
 
-	augmentedConfig = await normalizeAllRuleSettings(augmentedConfig);
+	augmentedConfig = await normalizeAllRuleSettings(stylelint._options, augmentedConfig);
 
 	return {
 		config: augmentedConfig,
