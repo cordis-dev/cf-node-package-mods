@@ -114,4 +114,8 @@
 !eslint/node_modules/@eslint/eslintrc/dist/eslintrc.cjs
 !stylelint
 !stylelint/lib
+!stylelint/lib/augmentConfig.mjs
+!stylelint/lib/cli.mjs
 !stylelint/lib/getPostcssResult.mjs
+!stylelint/lib/normalizeAllRuleSettings.mjs
+!stylelint/lib/standalone.mjs
