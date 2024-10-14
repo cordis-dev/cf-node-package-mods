@@ -156,6 +156,10 @@ const helpText = `
 
         Force enabling/disabling of color.
 
+      --[no-]validate
+
+        Force enable/disable the validation of the rules' options.
+
       --report-needless-disables, --rd
 
         Also report errors for "stylelint-disable" comments that are not blocking
@@ -239,7 +243,6 @@ const flags = {
 	formatter: {
 		shortFlag: 'f',
 		type: 'string',
-		default: DEFAULT_FORMATTER,
 	},
 	globbyOptions: {
 		aliases: ['go'],
@@ -299,6 +302,10 @@ const flags = {
 	stdinFilename: {
 		type: 'string',
 	},
+	validate: {
+		type: 'boolean',
+		default: true,
+	},
 	version: {
 		shortFlag: 'v',
 		type: 'boolean',
@@ -353,6 +360,7 @@ export default async function main(argv) {
 		reportNeedlessDisables,
 		stdin,
 		stdinFilename,
+		validate,
 		version,
 		only,
 	} = cli.flags;
@@ -382,6 +390,7 @@ export default async function main(argv) {
 	/** @type {import('stylelint').LinterOptions} */
 	const options = {
 		formatter,
+		_defaultFormatter: DEFAULT_FORMATTER,
 	};
 	
 	if (Array.isArray(only)) {
@@ -465,6 +474,10 @@ export default async function main(argv) {
 
 	if (isBoolean(fix)) {
 		options.fix = fix;
+	}
+
+	if (isBoolean(validate)) {
+		options.validate = validate;
 	}
 
 	if (isBoolean(reportNeedlessDisables)) {
