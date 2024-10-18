@@ -51,7 +51,7 @@ var Rule = /** @class */ (function (_super) {
         return _super.prototype.isEnabled.call(this) && isThresholdValid;
     };
     Rule.DEFAULT_THRESHOLD = 20;
-    Rule.MINIMUM_THRESHOLD = 2;
+    Rule.MINIMUM_THRESHOLD = 0;
     /* tslint:disable:object-literal-sort-keys */
     Rule.metadata = {
         ruleName: "cyclomatic-complexity",
