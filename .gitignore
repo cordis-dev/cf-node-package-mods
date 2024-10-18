@@ -119,3 +119,7 @@
 !stylelint/lib/getPostcssResult.mjs
 !stylelint/lib/normalizeAllRuleSettings.mjs
 !stylelint/lib/standalone.mjs
+!tslint
+!tslint/lib
+!tslint/lib/rules
+!tslint/lib/rules/cyclomaticComplexityRule.js
