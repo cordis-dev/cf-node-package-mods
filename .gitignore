@@ -101,6 +101,7 @@
 !eslint/lib/cli-engine/cli-engine.js
 !eslint/lib/cli.js
 !eslint/lib/eslint
+!eslint/lib/eslint/eslint-helpers.js
 !eslint/lib/eslint/eslint.js
 !eslint/lib/linter
 !eslint/lib/linter/linter.js
