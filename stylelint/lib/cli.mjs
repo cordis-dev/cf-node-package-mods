@@ -296,6 +296,10 @@ const flags = {
 		aliases: ['rd'],
 		type: 'boolean',
 	},
+	reportUnscopedDisables: {
+		aliases: ['rud'],
+		type: 'boolean',
+	},
 	stdin: {
 		type: 'boolean',
 	},
@@ -358,6 +362,7 @@ export default async function main(argv) {
 		reportDescriptionlessDisables,
 		reportInvalidScopeDisables,
 		reportNeedlessDisables,
+		reportUnscopedDisables,
 		stdin,
 		stdinFilename,
 		validate,
@@ -492,6 +497,10 @@ export default async function main(argv) {
 		options.reportDescriptionlessDisables = reportDescriptionlessDisables;
 	}
 
+	if (isBoolean(reportUnscopedDisables)) {
+		options.reportUnscopedDisables = reportUnscopedDisables;
+	}
+
 	if (isNumber(maxWarnings)) {
 		options.maxWarnings = maxWarnings;
 	}
@@ -588,7 +597,7 @@ function parseGlobbyOptions(value) {
 
 	try {
 		options = JSON.parse(value);
-	} catch (_) {
+	} catch {
 		return Promise.reject(errorMessage());
 	}
 

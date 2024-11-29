@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 
-import LazyResult from 'postcss/lib/lazy-result';
 import postcss from 'postcss';
 import path from 'path';
 
@@ -53,7 +52,7 @@ export default async function getPostcssResult(stylelint, { customSyntax, filePa
 		throw new Error('code or filePath required');
 	}
 
-	const postcssResult = await new LazyResult(postcssProcessor, getCode, postcssOptions);
+	const postcssResult = await postcssProcessor.process(getCode, postcssOptions).async();
 
 	if (filePath) {
 		stylelint._postcssResultCache.set(filePath, postcssResult);
