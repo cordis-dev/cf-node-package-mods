@@ -5,6 +5,7 @@ import path from 'path';
 
 import dynamicImport from './utils/dynamicImport.mjs';
 import getModulePath from './utils/getModulePath.mjs';
+import normalizeFixMode from './utils/normalizeFixMode.mjs';
 
 /** @import {Result, Syntax} from 'postcss' */
 /** @import {CustomSyntax, GetPostcssOptions, InternalApi as StylelintInternalApi} from 'stylelint' */
@@ -30,9 +31,10 @@ export default async function getPostcssResult(stylelint, { customSyntax, filePa
 		customSyntax = previouslyInferredExtensions[fileExtension];
 	}
 
+	const fix = normalizeFixMode(stylelint._options.fix);
 	const syntax = await (customSyntax
 		? getCustomSyntax(customSyntax, stylelint._options.configBasedir)
-		: cssSyntax(stylelint._options.fix));
+		: cssSyntax(fix === 'lax'));
 
 	const postcssOptions = {
 		from: filePath,
@@ -142,7 +144,7 @@ const previouslyInferredExtensions = {
 };
 
 /**
- * @param {boolean | undefined} fix
+ * @param {boolean} fix
  * @returns {Promise<Syntax>}
  */
 async function cssSyntax(fix) {
