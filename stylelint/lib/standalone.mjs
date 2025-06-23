@@ -14,7 +14,7 @@ import { AllFilesIgnoredError, NoFilesFoundError } from './utils/errors.mjs';
 import { assertString, isString } from './utils/validateTypes.mjs';
 import createPartialStylelintResult from './createPartialStylelintResult.mjs';
 import createStylelint from './createStylelint.mjs';
-import emitDeprecationWarning from './utils/emitDeprecationWarning.mjs';
+import { emitDeprecationWarning } from './utils/emitWarning.mjs';
 import filterFilePaths from './utils/filterFilePaths.mjs';
 import getConfigForFile from './getConfigForFile.mjs';
 import getFileIgnorer from './utils/getFileIgnorer.mjs';
@@ -22,10 +22,11 @@ import getFormatter from './utils/getFormatter.mjs';
 import lintSource from './lintSource.mjs';
 import normalizeFixMode from './utils/normalizeFixMode.mjs';
 import prepareReturnValue from './prepareReturnValue.mjs';
+import resolveOptionValue from './utils/resolveOptionValue.mjs';
 
 const ALWAYS_IGNORED_GLOBS = ['**/node_modules/**'];
 
-/** @import {Formatter, FormatterType} from 'stylelint' */
+/** @import {InternalApi, LintResult} from 'stylelint' */
 
 /**
  * @type {import('stylelint').PublicApi['lint']}
@@ -85,6 +86,8 @@ export default async function standalone({
 	}
 
 	const stylelint = createStylelint({
+		allowEmptyInput,
+		cache,
 		cacheLocation,
 		cacheStrategy,
 		config,
@@ -107,8 +110,6 @@ export default async function standalone({
 		validate,
 		only,
 	});
-
-	/** @type {Formatter} */
 
 	/** @see https://github.com/stylelint/stylelint/issues/7447 */
 	if (!quietDeprecationWarnings && formatter === 'github') {
@@ -198,8 +199,7 @@ export default async function standalone({
 		fileList = fileList.concat(ALWAYS_IGNORED_GLOBS.map((glob) => `!${glob}`));
 	}
 
-	// do not cache if config is explicitly overridden by option
-	const useCache = cache ?? config?.cache ?? false;
+	const useCache = await resolveOptionValue({ stylelint, name: 'cache', default: false });
 
 	if (!useCache) {
 		stylelint._fileCache.destroy();
@@ -285,7 +285,7 @@ export default async function standalone({
 		});
 
 		stylelintResults = await Promise.all(getStylelintResults);
-	} else if (allowEmptyInput || config?.allowEmptyInput || (await canAllowEmptyInput(stylelint))) {
+	} else if (await resolveOptionValue({ stylelint, name: 'allowEmptyInput', default: false })) {
 		stylelintResults = await Promise.all([]);
 	} else if (filePathsLengthBeforeIgnore) {
 		// All input files ignored
@@ -315,7 +315,7 @@ export default async function standalone({
  * @import {CssSyntaxError} from 'stylelint'
  *
  * @param {unknown} error
- * @returns {import('stylelint').LintResult}
+ * @returns {LintResult}
  */
 function handleError(error) {
 	if (error instanceof Error && error.name === 'CssSyntaxError') {
@@ -326,23 +326,13 @@ function handleError(error) {
 }
 
 /**
- * @param {import('stylelint').InternalApi} stylelint
- * @returns {Promise<boolean>}
- */
-async function canAllowEmptyInput(stylelint) {
-	const config = await getConfigForFile(stylelint);
-
-	return Boolean(config?.config?.allowEmptyInput);
-}
-
-/**
- * @param {import('stylelint').InternalApi} stylelint
- * @param {import('stylelint').LintResult} stylelintResult
+ * @param {InternalApi} stylelint
+ * @param {LintResult} stylelintResult
  * @param {string} [filePath]
  * @returns {Promise<void>}
  */
 async function postProcessStylelintResult(stylelint, stylelintResult, filePath) {
-	const configForFile = await getConfigForFile(stylelint, filePath, filePath);
+	const configForFile = await getConfigForFile({ stylelint, searchPath: filePath, filePath });
 
 	const config = configForFile === null ? {} : configForFile.config;
 
