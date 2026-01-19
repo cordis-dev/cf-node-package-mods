@@ -5,6 +5,7 @@ import path from 'path';
 
 import dynamicImport from './utils/dynamicImport.mjs';
 import getModulePath from './utils/getModulePath.mjs';
+import normalizeFilePath from './utils/normalizeFilePath.mjs';
 import normalizeFixMode from './utils/normalizeFixMode.mjs';
 
 /** @import {Result, Syntax} from 'postcss' */
@@ -19,13 +20,14 @@ const postcssProcessor = postcss();
  * @returns {Promise<Result>}
  */
 export default async function getPostcssResult(stylelint, { customSyntax, filePath, code } = {}) {
-	const cached = filePath ? stylelint._postcssResultCache.get(filePath) : undefined;
+	const normalizedPath = filePath ? normalizeFilePath(filePath) : undefined;
+	const cached = normalizedPath ? stylelint._postcssResultCache.get(normalizedPath) : undefined;
 
 	if (cached) {
 		return cached;
 	}
 	
-	const fileExtension = filePath ? path.extname(filePath).slice(1).toLowerCase() : '';
+	const fileExtension = normalizedPath ? path.extname(normalizedPath).slice(1).toLowerCase() : '';
 	if (previouslyInferredExtensions[fileExtension])
 	{
 		customSyntax = previouslyInferredExtensions[fileExtension];
@@ -56,8 +58,8 @@ export default async function getPostcssResult(stylelint, { customSyntax, filePa
 
 	const postcssResult = await postcssProcessor.process(getCode, postcssOptions).async();
 
-	if (filePath) {
-		stylelint._postcssResultCache.set(filePath, postcssResult);
+	if (normalizedPath) {
+		stylelint._postcssResultCache.set(normalizedPath, postcssResult);
 	}
 
 	return postcssResult;
