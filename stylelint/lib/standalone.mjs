@@ -30,6 +30,7 @@ import normalizeFixMode from './utils/normalizeFixMode.mjs';
 import prepareReturnValue from './prepareReturnValue.mjs';
 import resolveFilePath from './utils/resolveFilePath.mjs';
 import resolveOptionValue from './utils/resolveOptionValue.mjs';
+import toPath from './utils/toPath.mjs';
 
 const ALWAYS_IGNORED_GLOBS = ['**/node_modules/**'];
 
@@ -183,7 +184,7 @@ export default async function standalone({
 	}
 
 	let fileList = [files].flat().map((entry) => {
-		const globCWD = (globbyOptions && globbyOptions.cwd) || cwd;
+		const globCWD = toPath(globbyOptions?.cwd) || cwd;
 		const absolutePath = !isAbsolute(entry) ? join(globCWD, entry) : normalize(entry);
 
 		if (existsSync(absolutePath)) {
@@ -210,11 +211,9 @@ export default async function standalone({
 		absolute: true,
 	};
 
-	const globCWD = effectiveGlobbyOptions.cwd;
+	const globCWD = toPath(effectiveGlobbyOptions.cwd);
 
-	let filePaths = (await globby(fileList, effectiveGlobbyOptions)).map((entry) =>
-		typeof entry === 'string' ? entry : entry.path,
-	);
+	let filePaths = await globby(fileList, effectiveGlobbyOptions);
 
 	// Record the length of filePaths before ignore operation
 	// Prevent prompting "No files matching the pattern 'xx' were found." when .stylelintignore ignore all input files
